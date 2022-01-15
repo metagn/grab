@@ -9,9 +9,9 @@ runnableExamples:
 
   assert "abc.123".match(re"\w+\.\d+")
 
-  grab package("-Y https://github.com/arnetheduck/nim-result@#HEAD",
-               name = "result"):
-    results
+  grab package("-y https://github.com/arnetheduck/nim-result@#HEAD",
+               name = "result", forceInstall = true):
+    import results
 
   func works(): Result[int, string] =
     result.ok(42)
@@ -23,6 +23,11 @@ runnableExamples:
   assert fails().error == "bad luck"
 
 import macros, strutils, os
+
+when not compiles (var x = ""; x.delete(0 .. 0)):
+  template delete(x: untyped, s: HSlice): untyped =
+    let y = s
+    x.delete(y.a, y.b)
 
 proc stripLeft(package: var string) =
   package.delete(0 .. max(max(package.rfind('/'), package.rfind('\\')), package.rfind(' ')))
@@ -53,23 +58,26 @@ proc extractWithVersion(package: string): string =
 type Package* = object
   ## Package information to be used when installing and importing packages.
   name*, installCommand*, pathQuery*: string
+  forceInstall*: bool
 
-proc package*(installCommand, name, pathQuery: string): Package =
+proc package*(installCommand, name, pathQuery: string, forceInstall = false): Package =
   ## Generates package information with arguments to a `nimble install`
   ## command, package name, and optionally a name and version pair
   ## for the purpose of querying the module path.
   Package(installCommand: installCommand,
     name: parseName(name),
-    pathQuery: pathQuery)
+    pathQuery: pathQuery,
+    forceInstall: forceInstall)
 
-proc package*(installCommand, name: string): Package =
+proc package*(installCommand, name: string, forceInstall = false): Package =
   ## Generates package information with arguments to a `nimble install`
   ## command and a package name (optionally with a version).
   Package(installCommand: installCommand,
     name: parseName(name),
-    pathQuery: name)
+    pathQuery: name,
+    forceInstall: forceInstall)
 
-proc package*(installCommand: string): Package =
+proc package*(installCommand: string, forceInstall = false): Package =
   ## Converts the arguments of a `nimble install` command into
   ## package information.
   ## 
@@ -79,16 +87,29 @@ proc package*(installCommand: string): Package =
   ## ``package("fakename", "realname@0.1.0")``.
   Package(installCommand: installCommand,
     pathQuery: extractWithVersion(installCommand),
-    name: parseName(installCommand))
+    name: parseName(installCommand),
+    forceInstall: forceInstall)
+
+proc getPath(package: Package): string =
+  for line in staticExec("nimble path " & package.pathQuery).splitLines:
+    if line.len != 0:
+      result = line
 
 proc grabImpl(package: Package, imports: NimNode): NimNode =
   when defined(grabGiveHint):
     hint("grabbing: " & package, imports)
 
-  let installOutput = staticExec("nimble install -N " & package.installCommand)
-  if "Error: " in installOutput:
-    error("could not install " & package.name & ", install log:\p" &
-      installOutput, imports)
+  let doPath = package.pathQuery.len != 0
+  let doInstall = package.forceInstall or
+    (doPath and not dirExists(getPath(package)))
+
+  if doInstall:
+    let installOutput = staticExec("nimble install " &
+      (if package.forceInstall: "-Y " else: "-N ") &
+      package.installCommand)
+    if "Error: " in installOutput:
+      error("could not install " & package.name & ", install log:\p" &
+        installOutput, imports)
 
   let imports =
     if imports.len != 0:
@@ -96,61 +117,74 @@ proc grabImpl(package: Package, imports: NimNode): NimNode =
     else:
       let x = ident(package.name)
       x.copyLineInfo(imports)
-      newPar(x)
+      newStmtList(newTree(nnkImportStmt, x))
 
-  proc doImport(p: string, n: NimNode, res: NimNode) =
-    case n.kind
-    of nnkPar, nnkBracket, nnkCurly, nnkStmtList, nnkStmtListExpr:
-      for a in n:
-        doImport(p, a, res)
-    else:
-      var root = n
-      const replaceKinds = {nnkStrLit..nnkTripleStrLit, nnkIdent, nnkSym, nnkAccQuoted}
-      proc replace(s: NimNode): NimNode =
-        if p.len != 0:
-          var str = (p / $s)
-          if not str.endsWith(".nim"):
-            str.add(".nim")
-          newLit(str)
-        else:
-          s
-      if root.kind in replaceKinds:
-        res.add(replace root)
-      else:
-        while root.len != 0:
-          let index = if root.kind in {nnkCommand..nnkPostfix}: 1 else: 0
-          if root[index].kind in replaceKinds:
-            root[index] = replace root[index]
-            break
-          else:
-            root = root[index]
-        res.add(n)
-
-  let path = staticExec("nimble path " & package.pathQuery).strip
-  if "Error: " in path:
-    error("could not get path of " & package.pathQuery & ", got error:\p" &
+  let path = if doPath: getPath(package) else: ""
+  if doPath and not dirExists(path):
+    error("could not locate " & package.pathQuery & ", got error or invalid path:\p" &
       path, imports)
 
-  result = newNimNode(nnkImportStmt, imports)
-  for n in imports:
-    doImport(path, n, result)
+  proc patchImport(p: string, n: NimNode): NimNode =
+    var root = n
+    const replaceKinds = {nnkStrLit..nnkTripleStrLit, nnkIdent, nnkSym, nnkAccQuoted}
+    proc replace(s: NimNode): NimNode =
+      if p.len != 0:
+        var str = (p / $s)
+        if not str.endsWith(".nim"):
+          str.add(".nim")
+        newLit(str)
+      else:
+        s
+    if root.kind in replaceKinds:
+      replace root
+    else:
+      while root.len != 0:
+        let index = if root.kind in {nnkCommand..nnkPostfix}: 1 else: 0
+        if root[index].kind in replaceKinds:
+          root[index] = replace root[index]
+          break
+        else:
+          root = root[index]
+      n
 
-macro grab*(package: static Package, imports: varargs[untyped]) =
+  result = copy imports
+  for imp in result:
+    case imp.kind
+    of nnkImportStmt:
+      for i in 0 ..< imp.len:
+        imp[i] = patchImport(path, imp[i])
+    of nnkImportExceptStmt, nnkFromStmt, nnkIncludeStmt:
+      imp[0] = patchImport(path, imp[0])
+    else: discard
+
+macro grab*(package: static Package, imports: untyped) =
   ## Installs a package with Nimble and immediately imports it.
   ## 
-  ## Can be followed with a list of custom imports from the package.
-  ## This can also be an indented block.
+  ## Can be followed with a list of imports from the package in an indented
+  ## block. Imports outside this block will not work. By default, only
+  ## the main module of the package is imported.
+  ## 
+  ## This installs the package globally, and can fairly affect compilation time.
+  ## For this reason it should only be used for scripts and snippets and the like.
   ## 
   ## If the package is already installed, it will not reinstall it.
   ## This can be overriden by adding `-Y` at the start of the install command.
   ## 
   ## See module documentation for usage.
-  let package = package
   result = grabImpl(package, imports)
 
-macro grab*(installCommand: static string, imports: varargs[untyped]) =
+macro grab*(installCommand: static string, imports: untyped) =
   ## Shorthand for `grab(package(installCommand), imports)`.
   ## 
   ## See module documentation for usage.
-  let installCommand = installCommand
   result = grabImpl(package(installCommand), imports)
+
+macro grab*(package) =
+  ## Calls `grab(package, imports)` with the main module
+  ## deduced from the package name imported by default.
+  let imports = newNilLit()
+  imports.copyLineInfo(package)
+  let grabCall = ident("grab")
+  grabCall.copyLineInfo(package)
+  result = newCall(grabCall, package, imports)
+  result.copyLineInfo(package)

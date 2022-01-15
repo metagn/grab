@@ -97,7 +97,7 @@ proc getPath(package: Package): string =
 
 proc grabImpl(package: Package, imports: NimNode): NimNode =
   when defined(grabGiveHint):
-    hint("grabbing: " & package, imports)
+    hint("grabbing: " & $package, imports)
 
   let doPath = package.pathQuery.len != 0
   let doInstall = package.forceInstall or

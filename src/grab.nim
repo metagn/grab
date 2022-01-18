@@ -1,4 +1,5 @@
-## A module for installing and importing Nimble packages directly through code.
+## Adds a `grab` statement for installing and importing Nimble packages
+## directly through code.
 ## 
 ## Works with NimScript.
 
@@ -14,13 +15,13 @@ runnableExamples:
     import results
 
   func works(): Result[int, string] =
-    result.ok(42)
+    result.ok(123)
 
   func fails(): Result[int, string] =
-    result.err("bad luck")
+    result.err("abc")
   
   assert works().isOk
-  assert fails().error == "bad luck"
+  assert fails().error == "abc"
 
 import macros, strutils, os
 

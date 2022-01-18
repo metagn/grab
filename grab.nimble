@@ -1,7 +1,7 @@
 # Package
 
 version       = "0.1.0"
-author        = "hlaaftana"
+author        = "metagn"
 description   = "grab statement for importing Nimble packages, similar to Groovy's Grape"
 license       = "MIT"
 srcDir        = "src"
@@ -16,7 +16,7 @@ when (compiles do: import nimbleutils):
 
 task docs, "build docs for all modules":
   when declared(buildDocs):
-    buildDocs(gitUrl = "https://github.com/hlaaftana/grab")
+    buildDocs(gitUrl = "https://github.com/metagn/grab")
   else:
     echo "docs task not implemented, need nimbleutils"
 

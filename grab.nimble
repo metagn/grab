@@ -11,8 +11,10 @@ srcDir        = "src"
 
 requires "nim >= 1.4.0"
 
-when (compiles do: import nimbleutils):
-  import nimbleutils
+when (NimMajor, NimMinor) >= (1, 4):
+  when (compiles do: import nimbleutils):
+    import nimbleutils
+    # https://github.com/metagn/nimbleutils
 
 task docs, "build docs for all modules":
   when declared(buildDocs):

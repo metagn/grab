@@ -2,26 +2,26 @@
 ## directly through code.
 ## 
 ## Works with NimScript.
-
-runnableExamples:
-  import grab
-
-  grab "regex"
-
-  assert "abc.123".match(re"\w+\.\d+")
-
-  grab package("-N https://github.com/arnetheduck/nim-result@#HEAD",
-               name = "result", forceInstall = true):
-    import results
-
-  func works(): Result[int, string] =
-    result.ok(123)
-
-  func fails(): Result[int, string] =
-    result.err("abc")
-  
-  assert works().isOk
-  assert fails().error == "abc"
+##
+## .. code-block:: nim
+##   import grab
+## 
+##   grab "regex"
+## 
+##   assert "abc.123".match(re"\w+\.\d+")
+## 
+##   grab package("-Y https://github.com/arnetheduck/nim-result@#HEAD",
+##                name = "result", forceInstall = true):
+##     import results
+## 
+##   func works(): Result[int, string] =
+##     result.ok(123)
+## 
+##   func fails(): Result[int, string] =
+##     result.err("abc")
+##   
+##   assert works().isOk
+##   assert fails().error == "abc"
 
 import macros, strutils, os
 

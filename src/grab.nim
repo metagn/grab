@@ -10,7 +10,7 @@ runnableExamples:
 
   assert "abc.123".match(re"\w+\.\d+")
 
-  grab package("-y https://github.com/arnetheduck/nim-result@#HEAD",
+  grab package("-N https://github.com/arnetheduck/nim-result@#HEAD",
                name = "result", forceInstall = true):
     import results
 
@@ -105,8 +105,7 @@ proc grabImpl(package: Package, imports: NimNode): NimNode =
     (doPath and not dirExists(getPath(package)))
 
   if doInstall:
-    let installOutput = staticExec("nimble install " &
-      (if package.forceInstall: "-Y " else: "-N ") &
+    let installOutput = staticExec("nimble install -Y " &
       package.installCommand)
     if "Error: " in installOutput:
       error("could not install " & package.name & ", install log:\p" &

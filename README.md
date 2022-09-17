@@ -5,7 +5,7 @@ directly through Nim code, similar to Groovy's Grape and `@Grab`. Works
 with NimScript, as all the computation is done at compile time.
 
 This installs the package globally, and can affect compilation time. For
-this reason it should generally only be used for scripts and snippets and
+this reason it should generally only be used for scripts, tests, snippets and
 the like.
 
 ```nim

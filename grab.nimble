@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.0"
+version       = "0.1.1"
 author        = "metagn"
 description   = "grab statement for importing Nimble packages, similar to Groovy's Grape"
 license       = "MIT"
@@ -9,7 +9,7 @@ srcDir        = "src"
 
 # Dependencies
 
-requires "nim >= 1.4.0"
+requires "nim >= 1.0.0"
 
 when (NimMajor, NimMinor) >= (1, 4):
   when (compiles do: import nimbleutils):

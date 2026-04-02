@@ -1,3 +1,8 @@
+# Disclaimer
+
+Does not seem to work properly with Nim 2.0+ for packages with dependencies,
+likely a limitation of the new Nimble path handling. Compiling a second time works though. 
+
 # grab
 
 Adds a `grab` statement for installing and importing Nimble packages

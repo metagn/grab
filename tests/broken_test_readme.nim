@@ -1,3 +1,5 @@
+# only works when compiled the 2nd time for nim 2.0+, see readme
+
 import grab
 
 # install the package `regex` if not installed already, and import it

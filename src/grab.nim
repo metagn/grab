@@ -92,7 +92,7 @@ proc package*(installCommand: string, forceInstall = false): Package =
     forceInstall: forceInstall)
 
 proc getPath(package: Package): string =
-  for line in staticExec("nimble path " & package.pathQuery).splitLines:
+  for line in staticExec("nimble --silent path " & package.pathQuery).splitLines:
     if line.len != 0:
       result = line
 
